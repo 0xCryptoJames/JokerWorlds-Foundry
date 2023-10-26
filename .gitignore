@@ -14,11 +14,9 @@ docs/
 .env
 
 #Dependency files
-lib/
+
 node_modules/
 deps/
-
-.gitmodules
 .vscode/
 slither/
 
