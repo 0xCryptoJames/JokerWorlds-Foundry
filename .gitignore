@@ -18,6 +18,10 @@ lib/
 node_modules/
 deps/
 
-.github/
 .gitmodules
+.vscode/
+slither/
+
+
+
 
