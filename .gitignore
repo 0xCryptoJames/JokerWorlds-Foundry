@@ -17,8 +17,10 @@ docs/
 
 node_modules/
 deps/
+
 .vscode/
-slither/
+.github/
+
 
 
 

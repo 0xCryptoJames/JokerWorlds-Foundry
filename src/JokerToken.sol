@@ -20,18 +20,19 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     uint16 public protocolFeePercent = 50; // In basis points
     address public protocolFeeDestination;
     address public treasury;
-    mapping(address => bool) public isBlacklisted;
+    mapping(address => bool) public blacklisted;
 
-    event Blacklist(address _evilAddress, bool _isBlacklisted);
+    event Blacklist(address evilAddress, bool isBlacklisted);
     event JokerTokenTrade(address trader, bool isBuy, uint256 amount, uint256 payment);
 
-    constructor(address _treasury, address _protocolFeeDestination)
+    constructor(address initialTreasury, address initialProtocolFeeDestination)
         payable
         ERC20("Joker Token", "JOKER")
         Ownable(msg.sender)
     {
-        protocolFeeDestination = _protocolFeeDestination;
-        treasury = _treasury;
+        if (initialTreasury == address(0) || initialProtocolFeeDestination == address(0)) revert InvalidInputs();
+        protocolFeeDestination = initialProtocolFeeDestination;
+        treasury = initialTreasury;
         uint256 initialLiquidity = getReserve(MIDWAY_SUPPLY) - getReserve(0);
         if (msg.value < initialLiquidity) revert InsufficientPayment();
         _mint(treasury, MIDWAY_SUPPLY); // premint for reserve
@@ -50,30 +51,32 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         return reserve;
     }
 
-    function setFeeDestination(address _feeDestination) public onlyOwner {
-        protocolFeeDestination = _feeDestination;
+    function setFeeDestination(address newProtocolFeeDestination) external onlyOwner {
+        if (newProtocolFeeDestination == address(0)) revert InvalidInputs();
+        protocolFeeDestination = newProtocolFeeDestination;
     }
 
-    function setTreasury(address _treasury) public onlyOwner {
-        treasury = _treasury;
+    function setTreasury(address newTreasury) external onlyOwner {
+        if (newTreasury == address(0)) revert InvalidInputs();
+        treasury = newTreasury;
     }
     //In basis points
 
-    function setProtocolFeePercent(uint16 _feePercent) public onlyOwner {
-        if (_feePercent >= 10000) revert InvalidInputs();
-        protocolFeePercent = _feePercent;
+    function setProtocolFeePercent(uint16 newProtocolFeePercent) external onlyOwner {
+        if (newProtocolFeePercent >= 10000) revert InvalidInputs();
+        protocolFeePercent = newProtocolFeePercent;
     }
 
-    function blacklist(address user, bool _isBlacklisted) public onlyOwner {
-        isBlacklisted[user] = _isBlacklisted;
-        emit Blacklist(user, _isBlacklisted);
+    function blacklist(address user, bool isBlacklisted) external onlyOwner {
+        blacklisted[user] = isBlacklisted;
+        emit Blacklist(user, isBlacklisted);
     }
 
-    function setTransferEnabled(bool _isEnabled) public onlyOwner {
-        isTransferEnabled = _isEnabled;
+    function setTransferEnabled(bool isEnabled) external onlyOwner {
+        isTransferEnabled = isEnabled;
     }
 
-    function buyTokens(uint256 amount) public payable nonReentrant {
+    function buyTokens(uint256 amount) external payable nonReentrant {
         if (amount == 0) revert InvalidInputs();
         uint112 currentReserve = uint112(totalSupply());
         uint256 paymentAmount = getReserve(currentReserve + uint112(amount)) - getReserve(currentReserve);
@@ -85,22 +88,22 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         emit JokerTokenTrade(msg.sender, true, amount, msg.value);
     }
 
-    function sellTokens(uint256 amount) public payable nonReentrant {
+    function sellTokens(uint256 amount) external payable nonReentrant {
         if (amount == 0) revert InvalidInputs();
         if (amount > balanceOf(msg.sender)) revert InsufficientPayment();
         uint112 currentReserve = uint112(totalSupply());
         uint256 paymentAmount = getReserve(currentReserve) - getReserve(currentReserve - uint112(amount));
         uint256 protocolFee = paymentAmount * protocolFeePercent / 1 ether;
         _burn(msg.sender, amount);
-        (bool success1,) = protocolFeeDestination.call{value: protocolFee}("");
-        (bool success2,) = (msg.sender).call{value: paymentAmount - protocolFee}("");
-        if (!success1 || !success2) revert PaymentFailed();
         emit JokerTokenTrade(msg.sender, false, amount, paymentAmount);
+        (bool success1,) = protocolFeeDestination.call{value: protocolFee}("");
+        (bool success2,) = (msg.sender).call{value: paymentAmount - protocolFee, gas: 2300}("");
+        if (!success1 || !success2) revert PaymentFailed();
     }
 
     function _update(address from, address to, uint256 amount) internal virtual override {
         if (!isTransferEnabled) revert TransferDisabled();
-        if (isBlacklisted[from] || isBlacklisted[to]) revert AddressBlacklisted();
+        if (blacklisted[from] || blacklisted[to]) revert AddressBlacklisted();
         super._update(from, to, amount);
     }
 }
