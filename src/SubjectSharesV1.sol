@@ -126,9 +126,9 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
         uint112 supplyDiff = supply < MIDWAY_SUPPLY ? (MIDWAY_SUPPLY - supply) : (supply - MIDWAY_SUPPLY);
         uint256 reserve;
         if (supply < MIDWAY_SUPPLY) {
-            reserve = HALF_MAXPRICE * (Math.sqrt(1 + (uint256(supplyDiff) * uint256(supplyDiff))) - uint256(supplyDiff));
+            reserve = HALF_MAXPRICE * (Math.sqrt(1 + (uint256(supplyDiff) ** 2)) - uint256(supplyDiff));
         } else {
-            reserve = HALF_MAXPRICE * (Math.sqrt(1 + (uint256(supplyDiff) * uint256(supplyDiff))) + uint256(supplyDiff));
+            reserve = HALF_MAXPRICE * (Math.sqrt(1 + (uint256(supplyDiff) ** 2)) + uint256(supplyDiff));
         }
 
         return reserve;

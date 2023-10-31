@@ -38,19 +38,6 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         _mint(treasury, MIDWAY_SUPPLY); // premint for reserve
     }
 
-    //Sigmoid function
-    function getReserve(uint112 supply) private pure returns (uint256) {
-        uint112 supplyDiff = supply < MIDWAY_SUPPLY ? (MIDWAY_SUPPLY - supply) : (supply - MIDWAY_SUPPLY);
-        uint256 reserve;
-        if (supply < MIDWAY_SUPPLY) {
-            reserve = HALF_MAXPRICE * (Math.sqrt(1 + (uint256(supplyDiff) * uint256(supplyDiff))) - uint256(supplyDiff));
-        } else {
-            reserve = HALF_MAXPRICE * (Math.sqrt(1 + (uint256(supplyDiff) * uint256(supplyDiff))) + uint256(supplyDiff));
-        }
-
-        return reserve;
-    }
-
     function setFeeDestination(address newProtocolFeeDestination) external onlyOwner {
         if (newProtocolFeeDestination == address(0)) revert InvalidInputs();
         protocolFeeDestination = newProtocolFeeDestination;
@@ -99,6 +86,19 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         (bool success1,) = protocolFeeDestination.call{value: protocolFee}("");
         (bool success2,) = (msg.sender).call{value: paymentAmount - protocolFee, gas: 2300}("");
         if (!success1 || !success2) revert PaymentFailed();
+    }
+
+    //Sigmoid function
+    function getReserve(uint112 supply) private pure returns (uint256) {
+        uint112 supplyDiff = supply < MIDWAY_SUPPLY ? (MIDWAY_SUPPLY - supply) : (supply - MIDWAY_SUPPLY);
+        uint256 reserve;
+        if (supply < MIDWAY_SUPPLY) {
+            reserve = HALF_MAXPRICE * (Math.sqrt(1 + (uint256(supplyDiff) ** 2)) - uint256(supplyDiff));
+        } else {
+            reserve = HALF_MAXPRICE * (Math.sqrt(1 + (uint256(supplyDiff) ** 2)) + uint256(supplyDiff));
+        }
+
+        return reserve;
     }
 
     function _update(address from, address to, uint256 amount) internal virtual override {

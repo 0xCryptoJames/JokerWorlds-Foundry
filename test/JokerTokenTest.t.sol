@@ -3,19 +3,16 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {JokerToken} from "../src/JokerToken.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {HelperContract} from "./HelperContract.t.sol";
+import "forge-std/console.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract JokerTokenTest is Test {
+contract JokerTokenTest is Test, HelperContract {
     JokerToken public jokerToken;
-    address public treasury;
-    address public protocolFeeDestination;
-    uint256 public initialPayment;
 
     function setUp() public {
-        treasury = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
-        protocolFeeDestination = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
-        initialPayment = 0.005 ether;
-        jokerToken = new JokerToken{value: initialPayment}(treasury, protocolFeeDestination);
+        jokerToken = new JokerToken{value: 0.005 ether}(treasury, protocolFeeDestination);
     }
 
     function testPremintForReserve() public {
@@ -26,38 +23,54 @@ contract JokerTokenTest is Test {
         assertEq(jokerToken.owner(), address(this));
     }
 
-    function testInitialPayment() public {
+    function testInitialPayment(uint256 initialPayment, bytes32 salt1) public {
+        vm.assume(initialPayment < 0.005 ether);
         vm.expectRevert(abi.encodeWithSignature("InsufficientPayment()"));
-        JokerToken _jokerToken = new JokerToken{value: 0.004 ether}(treasury, protocolFeeDestination);
+        JokerToken _jokerToken = new JokerToken{salt: salt1, value: 0.004 ether}(treasury, protocolFeeDestination);
     }
 
-    function testSetFeeDestinationOnlyAllowOwner(address _caller, address _testAddress) public {
-        vm.prank(_caller);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", _caller));
-        jokerToken.setFeeDestination(_testAddress);
+    function testSetFeeDestinationOnlyAllowOwner(address caller, address testAddress) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
+        jokerToken.setFeeDestination(testAddress);
     }
 
-    function testSetTreasurylyAllowOwner(address _caller, address _testAddress) public {
-        vm.prank(_caller);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", _caller));
-        jokerToken.setTreasury(_testAddress);
+    function testSetTreasurylyAllowOwner(address caller, address testAddress) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
+        jokerToken.setTreasury(testAddress);
     }
 
-    function testSetProtocolFeePercentOnlyAllowOwner(address _caller, uint16 _feePercent) public {
-        vm.prank(_caller);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", _caller));
-        jokerToken.setProtocolFeePercent(_feePercent);
+    function testSetProtocolFeePercentOnlyAllowOwner(address caller, uint16 feePercent) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
+        jokerToken.setProtocolFeePercent(feePercent);
     }
 
-    function testBlacklistOnlyAllowOwner(address _caller, address user, bool _isBlacklisted) public {
-        vm.prank(_caller);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", _caller));
-        jokerToken.blacklist(user, _isBlacklisted);
+    function testBlacklistOnlyAllowOwner(address caller, address evil, bool isBlacklisted) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
+        jokerToken.blacklist(evil, isBlacklisted);
     }
 
-    function testSetTransferEnabledOnlyAllowOwner(address _caller, bool _isEnabled) public {
-        vm.prank(_caller);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", _caller));
-        jokerToken.setTransferEnabled(_isEnabled);
+    function testSetTransferEnabledOnlyAllowOwner(address caller, bool isEnabled) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
+        jokerToken.setTransferEnabled(isEnabled);
+    }
+
+    function invariant_A() public {
+        vm.prank(user);
+        uint256 calculatedTotalReserve = jokerToken.HALF_MAXPRICE()
+            * (
+                Math.sqrt(1 + (jokerToken.totalSupply() - jokerToken.MIDWAY_SUPPLY()) ** 2)
+                    + (jokerToken.totalSupply() - jokerToken.MIDWAY_SUPPLY())
+            );
+        assertGe(address(jokerToken).balance, calculatedTotalReserve);
     }
 }
