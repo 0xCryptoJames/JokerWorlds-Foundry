@@ -77,7 +77,7 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
         uint112 currentSupply = uint112(totalSupply());
         if (amount == 0 || (currentSupply + amount) >= MAX_SUPPLY) revert InvalidInputs();
         address protocolFeeDestination = ISubjectsRegistryV1(REGISTRY).protocolFeeDestination();
-        uint256 paymentAmount = _getReserve(currentSupply + uint112(amount)) - _getReserve(currentSupply);
+        uint256 paymentAmount = _getReserve(currentSupply + amount) - _getReserve(currentSupply);
         (uint256 protocolFee, uint256 subjectFee) = _getFees(paymentAmount);
         if (JOKER_TOKEN.balanceOf(msg.sender) < (paymentAmount + protocolFee + subjectFee)) {
             revert InsufficientPayment();
@@ -101,7 +101,7 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
         {
             //Scope for avoiding stack too deep errors
             uint256 reserve0 = _getReserve(currentSupply);
-            uint256 paymentAmount0 = _getReserve(currentSupply - uint112(amount)) - _getReserve(currentSupply);
+            uint256 paymentAmount0 = _getReserve(currentSupply - amount) - _getReserve(currentSupply);
             uint256 profitToShare = currentReserve > reserve0 ? (currentReserve - reserve0) : 0; //The total incomes distributed by the application linked to this pool
             paymentAmount = paymentAmount0 * profitToShare / reserve0 + paymentAmount0;
         }
@@ -118,8 +118,10 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
     }
 
     function _update(address from, address to, uint256 amount) internal virtual override {
+        if (amount >= type(uint112).max) revert InvalidInputs();
         if (isUserBlacklisted[from] || isUserBlacklisted[to] || isPoolBlacklisted) revert AddressBlacklisted();
         super._update(from, to, amount);
+        if (totalSupply() >= type(uint112).max) revert InvalidInputs();
     }
 
     function _getReserve(uint112 supply) private view returns (uint256) {

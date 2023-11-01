@@ -3,12 +3,12 @@ src = "src"
 out = "out"
 libs = ["lib"]
 
-[profile.default.compiler]
-auto_detect_solc = true
 
-[profile.default.fuzz]
+[fuzz]
 runs = 500
 depth = 50
 
-
+[invariant]
+runs = 500
+depth = 50
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

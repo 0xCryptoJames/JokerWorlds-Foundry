@@ -33,7 +33,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         if (initialTreasury == address(0) || initialProtocolFeeDestination == address(0)) revert InvalidInputs();
         protocolFeeDestination = initialProtocolFeeDestination;
         treasury = initialTreasury;
-        uint256 initialLiquidity = getReserve(MIDWAY_SUPPLY) - getReserve(0);
+        uint256 initialLiquidity = _getReserve(MIDWAY_SUPPLY) - _getReserve(0);
         if (msg.value < initialLiquidity) revert InsufficientPayment();
         _mint(treasury, MIDWAY_SUPPLY); // premint for reserve
     }
@@ -63,10 +63,10 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         isTransferEnabled = isEnabled;
     }
 
-    function buyTokens(uint256 amount) external payable nonReentrant {
+    function buyTokens(uint112 amount) external payable nonReentrant {
         if (amount == 0) revert InvalidInputs();
         uint112 currentReserve = uint112(totalSupply());
-        uint256 paymentAmount = getReserve(currentReserve + uint112(amount)) - getReserve(currentReserve);
+        uint256 paymentAmount = _getReserve(currentReserve + amount) - _getReserve(currentReserve);
         uint256 protocolFee = paymentAmount * protocolFeePercent / 10000;
         if (msg.value < paymentAmount + protocolFee) revert InsufficientPayment();
         (bool success,) = protocolFeeDestination.call{value: protocolFee}("");
@@ -75,11 +75,11 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         emit JokerTokenTrade(msg.sender, true, amount, msg.value);
     }
 
-    function sellTokens(uint256 amount) external payable nonReentrant {
+    function sellTokens(uint112 amount) external nonReentrant {
         if (amount == 0) revert InvalidInputs();
         if (amount > balanceOf(msg.sender)) revert InsufficientPayment();
         uint112 currentReserve = uint112(totalSupply());
-        uint256 paymentAmount = getReserve(currentReserve) - getReserve(currentReserve - uint112(amount));
+        uint256 paymentAmount = _getReserve(currentReserve) - _getReserve(currentReserve - amount);
         uint256 protocolFee = paymentAmount * protocolFeePercent / 1 ether;
         _burn(msg.sender, amount);
         emit JokerTokenTrade(msg.sender, false, amount, paymentAmount);
@@ -89,7 +89,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     }
 
     //Sigmoid function
-    function getReserve(uint112 supply) private pure returns (uint256) {
+    function _getReserve(uint112 supply) private pure returns (uint256) {
         uint112 supplyDiff = supply < MIDWAY_SUPPLY ? (MIDWAY_SUPPLY - supply) : (supply - MIDWAY_SUPPLY);
         uint256 reserve;
         if (supply < MIDWAY_SUPPLY) {
@@ -102,8 +102,10 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     }
 
     function _update(address from, address to, uint256 amount) internal virtual override {
+        if (amount >= type(uint112).max) revert InvalidInputs();
+        super._update(from, to, amount);
+        if (totalSupply() >= type(uint112).max) revert InvalidInputs();
         if (!isTransferEnabled) revert TransferDisabled();
         if (blacklisted[from] || blacklisted[to]) revert AddressBlacklisted();
-        super._update(from, to, amount);
     }
 }
