@@ -33,8 +33,8 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         if (initialTreasury == address(0) || initialProtocolFeeDestination == address(0)) revert InvalidInputs();
         protocolFeeDestination = initialProtocolFeeDestination;
         treasury = initialTreasury;
-        uint256 initialLiquidity = _getReserve(MIDWAY_SUPPLY) - _getReserve(0);
-        if (msg.value < initialLiquidity) revert InsufficientPayment();
+        //initialLiquidity >= _getReserve(MIDWAY_SUPPLY) - _getReserve(0);
+        if (msg.value < 0.005 ether) revert InsufficientPayment();
         _mint(treasury, MIDWAY_SUPPLY); // premint for reserve
     }
 

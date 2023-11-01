@@ -16,52 +16,99 @@ contract JokerTokenTest is Test, HelperContract {
         jokerToken = new JokerToken{value: 0.005 ether}(treasury, protocolFeeDestination);
     }
 
-    function testPremintForReserve() external {
-        assertEq(jokerToken.balanceOf(treasury), 5000000 * (10 ** 18));
+    function testContractDeployment(
+        uint256 initialPayment,
+        address treasuryForTest,
+        address protocolFeeDestinationForTest
+    ) external {
+        vm.assume(initialPayment < 10 ether);
+        vm.deal(address(this), 1000 ether);
+        if (initialPayment < 0.005 ether) {
+            if (treasuryForTest == address(0) || protocolFeeDestinationForTest == address(0)) {
+                vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
+                JokerToken jokerToken0 =
+                    new JokerToken{value: initialPayment}(treasuryForTest, protocolFeeDestinationForTest);
+            }
+            vm.expectRevert(abi.encodeWithSignature("InsufficientPayment()"));
+            JokerToken jokerToken1 =
+                new JokerToken{value: initialPayment}(treasuryForTest, protocolFeeDestinationForTest);
+        }
+
+        if (
+            (initialPayment >= 0.005 ether)
+                && (treasuryForTest == address(0) || protocolFeeDestinationForTest == address(0))
+        ) {
+            vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
+            JokerToken jokerToken2 =
+                new JokerToken{value: initialPayment}(treasuryForTest, protocolFeeDestinationForTest);
+        }
+
+        if (
+            initialPayment >= 0.005 ether && treasuryForTest != address(0)
+                && protocolFeeDestinationForTest != address(0)
+        ) {
+            JokerToken jokerToken3 =
+                new JokerToken{value: initialPayment}(treasuryForTest, protocolFeeDestinationForTest);
+            assert(jokerToken3.balanceOf(treasuryForTest) == 5000000 * (10 ** 18));
+            assert(jokerToken3.owner() == address(this));
+        }
     }
 
-    function testOwnerOfContract() external {
-        assertEq(jokerToken.owner(), address(this));
-    }
-
-    function testInitialPayment(uint256 initialPayment, bytes32 salt1) external {
-        vm.assume(initialPayment < 0.005 ether);
-        vm.expectRevert(abi.encodeWithSignature("InsufficientPayment()"));
-        JokerToken _jokerToken = new JokerToken{salt: salt1, value: 0.004 ether}(treasury, protocolFeeDestination);
-    }
-
-    function testSetFeeDestinationOnlyAllowOwner(address caller, address testAddress) external {
-        vm.assume(caller != address(this));
-        vm.prank(caller);
+    function testOnlyOwnerAllowedFunctions(
+        address caller,
+        address testFeeDestinationAddress,
+        address testTreasuryAddress,
+        uint16 newFeePercent,
+        address evil,
+        bool isBlacklisted,
+        bool isEnabled
+    ) external {
+        vm.startPrank(caller);
+        vm.deal(caller, 10 ether);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
-        jokerToken.setFeeDestination(testAddress);
-    }
+        jokerToken.setFeeDestination(testFeeDestinationAddress);
 
-    function testSetTreasurylyAllowOwner(address caller, address testAddress) external {
-        vm.assume(caller != address(this));
-        vm.prank(caller);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
-        jokerToken.setTreasury(testAddress);
-    }
+        jokerToken.setTreasury(testTreasuryAddress);
 
-    function testSetProtocolFeePercentOnlyAllowOwner(address caller, uint16 feePercent) external {
-        vm.assume(feePercent < 10000);
-        vm.prank(caller);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
-        jokerToken.setProtocolFeePercent(feePercent);
-    }
+        jokerToken.setProtocolFeePercent(newFeePercent);
 
-    function testBlacklistOnlyAllowOwner(address caller, address evil, bool isBlacklisted) external {
-        vm.assume(caller != address(this));
-        vm.prank(caller);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
         jokerToken.blacklist(evil, isBlacklisted);
-    }
 
-    function testSetTransferEnabledOnlyAllowOwner(address caller, bool isEnabled) external {
-        vm.assume(caller != address(this));
-        vm.prank(caller);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
         jokerToken.setTransferEnabled(isEnabled);
+        vm.stopPrank();
+
+        if (testFeeDestinationAddress == address(0)) {
+            vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
+            jokerToken.setFeeDestination(testFeeDestinationAddress);
+        } else {
+            jokerToken.setFeeDestination(testFeeDestinationAddress);
+            assert(jokerToken.protocolFeeDestination() == testFeeDestinationAddress);
+        }
+
+        if (testTreasuryAddress == address(0)) {
+            vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
+            jokerToken.setTreasury(testTreasuryAddress);
+        } else {
+            jokerToken.setTreasury(testTreasuryAddress);
+            assert(jokerToken.treasury() == testTreasuryAddress);
+        }
+
+        if (newFeePercent >= 10000) {
+            vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
+            jokerToken.setProtocolFeePercent(newFeePercent);
+        } else {
+            jokerToken.setProtocolFeePercent(newFeePercent);
+            assert(jokerToken.protocolFeePercent() == newFeePercent);
+        }
+
+        jokerToken.blacklist(evil, isBlacklisted);
+        assert(jokerToken.blacklisted(evil) == isBlacklisted);
+
+        jokerToken.setTransferEnabled(isEnabled);
+        assert(jokerToken.isTransferEnabled() == isEnabled);
     }
 }
