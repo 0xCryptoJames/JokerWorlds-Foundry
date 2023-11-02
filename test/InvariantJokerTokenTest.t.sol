@@ -5,19 +5,19 @@ import {Test} from "forge-std/Test.sol";
 import {JokerToken} from "../src/JokerToken.sol";
 import {HelperContract} from "./HelperContract.t.sol";
 import {console} from "forge-std/console.sol";
-import {Handler} from "./handler/Handler.sol";
+import {OpenTest} from "./handlers/OpenTest.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract InvariantJokerTokenTest is Test, HelperContract {
     JokerToken jokerToken;
-    Handler handler;
+    OpenTest handlerOfOpenTest;
 
     function setUp() external {
         vm.deal(address(this), 100 ether);
         jokerToken = new JokerToken{value: 0.005 ether}(treasury, protocolFeeDestination);
-        handler = new Handler(jokerToken);
-        targetContract(address(handler));
+        handlerOfOpenTest = new OpenTest(jokerToken);
+        targetContract(address(handlerOfOpenTest));
     }
 
     function invariant_alwaysHaveEnoughEtherReserve() external view {

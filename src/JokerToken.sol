@@ -14,7 +14,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     error AddressBlacklisted();
 
     uint256 public constant HALF_MAXPRICE = 0.005 ether;
-    uint112 public constant MIDWAY_SUPPLY = 5000000 * (10 ** 18);
+    uint112 public constant MIDWAY_SUPPLY = 5000000 * (10 ** 8);
 
     bool public isTransferEnabled = true;
     uint16 public protocolFeePercent = 50; // In basis points
@@ -23,19 +23,30 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     mapping(address => bool) public blacklisted;
 
     event Blacklist(address evilAddress, bool isBlacklisted);
-    event JokerTokenTrade(address trader, bool isBuy, uint256 amount, uint256 payment);
+    event JokerTokenTrade(
+        address indexed tokenContract, address indexed trader, bool isBuy, uint256 amount, uint256 payment
+    );
 
     constructor(address initialTreasury, address initialProtocolFeeDestination)
         payable
         ERC20("Joker Token", "JOKER")
         Ownable(msg.sender)
     {
-        if (initialTreasury == address(0) || initialProtocolFeeDestination == address(0)) revert InvalidInputs();
+        if (initialTreasury == address(0) || initialProtocolFeeDestination == address(0) || msg.value < 0.005 ether) {
+            revert InvalidInputs();
+        }
         protocolFeeDestination = initialProtocolFeeDestination;
         treasury = initialTreasury;
         //initialLiquidity >= _getReserve(MIDWAY_SUPPLY) - _getReserve(0);
-        if (msg.value < 0.005 ether) revert InsufficientPayment();
         _mint(treasury, MIDWAY_SUPPLY); // premint for reserve
+    }
+
+    function decimals() public view virtual override returns (uint8) {
+        return 8;
+    }
+
+    function getReserve(uint112 supply) external pure returns (uint256) {
+        return _getReserve(supply);
     }
 
     function setFeeDestination(address newProtocolFeeDestination) external onlyOwner {
@@ -47,8 +58,8 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         if (newTreasury == address(0)) revert InvalidInputs();
         treasury = newTreasury;
     }
-    //In basis points
 
+    //In basis points
     function setProtocolFeePercent(uint16 newProtocolFeePercent) external onlyOwner {
         if (newProtocolFeePercent >= 10000) revert InvalidInputs();
         protocolFeePercent = newProtocolFeePercent;
@@ -64,7 +75,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     }
 
     function buyTokens(uint112 amount) external payable nonReentrant {
-        if (amount == 0) revert InvalidInputs();
+        if (amount == 0 || (totalSupply() + amount > type(uint112).max)) revert InvalidInputs();
         uint112 currentReserve = uint112(totalSupply());
         uint256 paymentAmount = _getReserve(currentReserve + amount) - _getReserve(currentReserve);
         uint256 protocolFee = paymentAmount * protocolFeePercent / 10000;
@@ -72,7 +83,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         (bool success,) = protocolFeeDestination.call{value: protocolFee}("");
         if (!success) revert PaymentFailed();
         _mint(msg.sender, amount);
-        emit JokerTokenTrade(msg.sender, true, amount, msg.value);
+        emit JokerTokenTrade(address(this), msg.sender, true, amount, msg.value);
     }
 
     function sellTokens(uint112 amount) external nonReentrant {
@@ -82,7 +93,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         uint256 paymentAmount = _getReserve(currentReserve) - _getReserve(currentReserve - amount);
         uint256 protocolFee = paymentAmount * protocolFeePercent / 1 ether;
         _burn(msg.sender, amount);
-        emit JokerTokenTrade(msg.sender, false, amount, paymentAmount);
+        emit JokerTokenTrade(address(this), msg.sender, false, amount, paymentAmount);
         (bool success1,) = protocolFeeDestination.call{value: protocolFee}("");
         (bool success2,) = (msg.sender).call{value: paymentAmount - protocolFee, gas: 2300}("");
         if (!success1 || !success2) revert PaymentFailed();
@@ -102,9 +113,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     }
 
     function _update(address from, address to, uint256 amount) internal virtual override {
-        if (amount >= type(uint112).max) revert InvalidInputs();
         super._update(from, to, amount);
-        if (totalSupply() >= type(uint112).max) revert InvalidInputs();
         if (!isTransferEnabled) revert TransferDisabled();
         if (blacklisted[from] || blacklisted[to]) revert AddressBlacklisted();
     }

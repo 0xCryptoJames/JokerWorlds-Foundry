@@ -17,41 +17,27 @@ contract JokerTokenTest is Test, HelperContract {
     }
 
     function testContractDeployment(
+        address caller,
         uint256 initialPayment,
         address treasuryForTest,
         address protocolFeeDestinationForTest
     ) external {
-        vm.assume(initialPayment < 10 ether);
-        vm.deal(address(this), 1000 ether);
-        if (initialPayment < 0.005 ether) {
-            if (treasuryForTest == address(0) || protocolFeeDestinationForTest == address(0)) {
-                vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
-                JokerToken jokerToken0 =
-                    new JokerToken{value: initialPayment}(treasuryForTest, protocolFeeDestinationForTest);
-            }
-            vm.expectRevert(abi.encodeWithSignature("InsufficientPayment()"));
-            JokerToken jokerToken1 =
-                new JokerToken{value: initialPayment}(treasuryForTest, protocolFeeDestinationForTest);
-        }
-
+        vm.assume(caller != address(0) && initialPayment < 10 ether);
+        vm.startPrank(caller);
+        vm.deal(caller, 100 ether);
         if (
-            (initialPayment >= 0.005 ether)
-                && (treasuryForTest == address(0) || protocolFeeDestinationForTest == address(0))
+            initialPayment < 0.005 ether || treasuryForTest == address(0) || protocolFeeDestinationForTest == address(0)
         ) {
             vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
-            JokerToken jokerToken2 =
+            JokerToken jokerToken0 =
                 new JokerToken{value: initialPayment}(treasuryForTest, protocolFeeDestinationForTest);
-        }
-
-        if (
-            initialPayment >= 0.005 ether && treasuryForTest != address(0)
-                && protocolFeeDestinationForTest != address(0)
-        ) {
-            JokerToken jokerToken3 =
+        } else {
+            JokerToken jokerToken1 =
                 new JokerToken{value: initialPayment}(treasuryForTest, protocolFeeDestinationForTest);
-            assert(jokerToken3.balanceOf(treasuryForTest) == 5000000 * (10 ** 18));
-            assert(jokerToken3.owner() == address(this));
+            assert(jokerToken1.balanceOf(treasuryForTest) == 5000000 * (10 ** 8));
+            assert(jokerToken1.owner() == caller);
         }
+        vm.stopPrank();
     }
 
     function testOnlyOwnerAllowedFunctions(
@@ -63,6 +49,7 @@ contract JokerTokenTest is Test, HelperContract {
         bool isBlacklisted,
         bool isEnabled
     ) external {
+        vm.assume(caller != address(0));
         vm.startPrank(caller);
         vm.deal(caller, 10 ether);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
@@ -110,5 +97,59 @@ contract JokerTokenTest is Test, HelperContract {
 
         jokerToken.setTransferEnabled(isEnabled);
         assert(jokerToken.isTransferEnabled() == isEnabled);
+    }
+
+    function testBuyTokens(address caller, uint112 amount, uint256 paymentAmount) external {
+        vm.assume(caller != address(0) && paymentAmount < 500 ether);
+        vm.startPrank(caller);
+        vm.deal(caller, 1000 ether);
+        if (amount == 0 || (jokerToken.totalSupply() + amount > type(uint112).max)) {
+            vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
+            jokerToken.buyTokens{value: paymentAmount}(amount);
+        } else {
+            uint112 currentReserve0 = uint112(jokerToken.totalSupply());
+            uint256 paymentAmount0 =
+                jokerToken.getReserve(currentReserve0 + amount) - jokerToken.getReserve(currentReserve0);
+            uint256 protocolFee = paymentAmount0 * jokerToken.protocolFeePercent() / 10000;
+            if (paymentAmount < paymentAmount0 + protocolFee) {
+                vm.expectRevert(abi.encodeWithSignature("InsufficientPayment()"));
+                jokerToken.buyTokens{value: paymentAmount}(amount);
+            } else {
+                uint256 balanceBefore0 = jokerToken.balanceOf(caller);
+                jokerToken.buyTokens{value: paymentAmount}(amount);
+                uint256 balanceAfter0 = jokerToken.balanceOf(caller);
+
+                assert(uint112(balanceAfter0 - balanceBefore0) == amount);
+            }
+        }
+        vm.stopPrank();
+    }
+
+    function testSellTokens(address caller, uint112 amount) external {
+        vm.assume(caller != address(0));
+        vm.startPrank(caller);
+        vm.deal(caller, 10 ether);
+        if (amount == 0) {
+            vm.expectRevert(abi.encodeWithSignature("InvalidInputs()"));
+            jokerToken.sellTokens(amount);
+        } else {
+            if (amount > jokerToken.balanceOf(caller)) {
+                vm.expectRevert(abi.encodeWithSignature("InsufficientPayment()"));
+                jokerToken.sellTokens(amount);
+            } else {
+                uint256 balanceBefore0 = jokerToken.balanceOf(caller);
+                uint256 balanceBefore1 = address(jokerToken).balance;
+                uint112 currentReserve1 = uint112(jokerToken.totalSupply());
+                uint256 paymentAmount1 =
+                    jokerToken.getReserve(currentReserve1) - jokerToken.getReserve(currentReserve1 - amount);
+                jokerToken.sellTokens(amount);
+                uint256 balanceAfter0 = jokerToken.balanceOf(caller);
+                uint256 balanceAfter1 = address(jokerToken).balance;
+
+                assert(uint112(balanceBefore0 - balanceAfter0) == amount);
+                assert(balanceBefore1 - balanceAfter1 == paymentAmount1);
+            }
+        }
+        vm.stopPrank();
     }
 }
