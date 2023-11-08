@@ -22,7 +22,8 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     address public treasury;
     mapping(address => bool) public blacklisted;
 
-    event Blacklist(address evilAddress, bool isBlacklisted);
+    event Blacklist(address indexed tokenContract, address indexed evilAddress, bool isBlacklisted);
+
     event JokerTokenTrade(
         address indexed tokenContract, address indexed trader, bool isBuy, uint256 amount, uint256 payment
     );
@@ -39,6 +40,10 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         treasury = initialTreasury;
         //initialLiquidity >= _getReserve(MIDWAY_SUPPLY) - _getReserve(0);
         _mint(treasury, MIDWAY_SUPPLY); // premint for reserve
+    }
+
+    receive() external payable {
+        revert PaymentFailed();
     }
 
     function decimals() public view virtual override returns (uint8) {
@@ -67,7 +72,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
 
     function blacklist(address user, bool isBlacklisted) external onlyOwner {
         blacklisted[user] = isBlacklisted;
-        emit Blacklist(user, isBlacklisted);
+        emit Blacklist(address(this), user, isBlacklisted);
     }
 
     function setTransferEnabled(bool isEnabled) external onlyOwner {
@@ -80,7 +85,7 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         uint256 paymentAmount = _getReserve(currentReserve + amount) - _getReserve(currentReserve);
         uint256 protocolFee = paymentAmount * protocolFeePercent / 10000;
         if (msg.value < paymentAmount + protocolFee) revert InsufficientPayment();
-        (bool success,) = protocolFeeDestination.call{value: protocolFee}("");
+        (bool success,) = payable(protocolFeeDestination).call{value: protocolFee}("");
         if (!success) revert PaymentFailed();
         _mint(msg.sender, amount);
         emit JokerTokenTrade(address(this), msg.sender, true, amount, msg.value);
@@ -94,13 +99,13 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         uint256 protocolFee = paymentAmount * protocolFeePercent / 1 ether;
         _burn(msg.sender, amount);
         emit JokerTokenTrade(address(this), msg.sender, false, amount, paymentAmount);
-        (bool success1,) = protocolFeeDestination.call{value: protocolFee}("");
-        (bool success2,) = (msg.sender).call{value: paymentAmount - protocolFee, gas: 2300}("");
+        (bool success1,) = payable(protocolFeeDestination).call{value: protocolFee}("");
+        (bool success2,) = payable(msg.sender).call{value: paymentAmount - protocolFee}("");
         if (!success1 || !success2) revert PaymentFailed();
     }
 
     //Sigmoid function
-    function _getReserve(uint112 supply) private pure returns (uint256) {
+    function _getReserve(uint112 supply) internal pure returns (uint256) {
         uint112 supplyDiff = supply < MIDWAY_SUPPLY ? (MIDWAY_SUPPLY - supply) : (supply - MIDWAY_SUPPLY);
         uint256 reserve;
         if (supply < MIDWAY_SUPPLY) {
@@ -113,8 +118,8 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
     }
 
     function _update(address from, address to, uint256 amount) internal virtual override {
-        super._update(from, to, amount);
         if (!isTransferEnabled) revert TransferDisabled();
         if (blacklisted[from] || blacklisted[to]) revert AddressBlacklisted();
+        super._update(from, to, amount);
     }
 }

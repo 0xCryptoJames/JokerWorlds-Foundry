@@ -1,14 +1,13 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Test} from "forge-std/Test.sol";
-import {JokerToken} from "../src/JokerToken.sol";
-import {HelperContract} from "./HelperContract.t.sol";
-import {console} from "forge-std/console.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "forge-std/Test.sol";
+import "../src/JokerToken.sol";
+import "./HelperContract.t.sol";
 
 contract JokerTokenTest is Test, HelperContract {
+    using stdStorage for StdStorage;
+
     JokerToken public jokerToken;
 
     function setUp() external {
@@ -22,7 +21,7 @@ contract JokerTokenTest is Test, HelperContract {
         address treasuryForTest,
         address protocolFeeDestinationForTest
     ) external {
-        vm.assume(caller != address(0) && initialPayment < 10 ether);
+        vm.assume(caller != address(0) && initialPayment < 90 ether);
         vm.startPrank(caller);
         vm.deal(caller, 100 ether);
         if (
@@ -49,7 +48,7 @@ contract JokerTokenTest is Test, HelperContract {
         bool isBlacklisted,
         bool isEnabled
     ) external {
-        vm.assume(caller != address(0));
+        vm.assume(caller != address(0) && caller != jokerToken.owner());
         vm.startPrank(caller);
         vm.deal(caller, 10 ether);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
@@ -92,6 +91,8 @@ contract JokerTokenTest is Test, HelperContract {
             assert(jokerToken.protocolFeePercent() == newFeePercent);
         }
 
+        vm.expectEmit(true, true, false, true, address(jokerToken));
+        emit Blacklist(address(jokerToken), evil, isBlacklisted);
         jokerToken.blacklist(evil, isBlacklisted);
         assert(jokerToken.blacklisted(evil) == isBlacklisted);
 
@@ -100,7 +101,7 @@ contract JokerTokenTest is Test, HelperContract {
     }
 
     function testBuyTokens(address caller, uint112 amount, uint256 paymentAmount) external {
-        vm.assume(caller != address(0) && paymentAmount < 500 ether);
+        vm.assume(caller != address(0) && paymentAmount < 900 ether);
         vm.startPrank(caller);
         vm.deal(caller, 1000 ether);
         if (amount == 0 || (jokerToken.totalSupply() + amount > type(uint112).max)) {
@@ -116,6 +117,8 @@ contract JokerTokenTest is Test, HelperContract {
                 jokerToken.buyTokens{value: paymentAmount}(amount);
             } else {
                 uint256 balanceBefore0 = jokerToken.balanceOf(caller);
+                vm.expectEmit(true, true, true, true, address(jokerToken));
+                emit JokerTokenTrade(address(jokerToken), caller, true, amount, paymentAmount);
                 jokerToken.buyTokens{value: paymentAmount}(amount);
                 uint256 balanceAfter0 = jokerToken.balanceOf(caller);
 
@@ -140,14 +143,16 @@ contract JokerTokenTest is Test, HelperContract {
                 uint256 balanceBefore0 = jokerToken.balanceOf(caller);
                 uint256 balanceBefore1 = address(jokerToken).balance;
                 uint112 currentReserve1 = uint112(jokerToken.totalSupply());
-                uint256 paymentAmount1 =
+                uint256 paymentAmount =
                     jokerToken.getReserve(currentReserve1) - jokerToken.getReserve(currentReserve1 - amount);
+                vm.expectEmit(true, true, true, true, address(jokerToken));
+                emit JokerTokenTrade(address(jokerToken), caller, false, amount, paymentAmount);
                 jokerToken.sellTokens(amount);
                 uint256 balanceAfter0 = jokerToken.balanceOf(caller);
                 uint256 balanceAfter1 = address(jokerToken).balance;
 
                 assert(uint112(balanceBefore0 - balanceAfter0) == amount);
-                assert(balanceBefore1 - balanceAfter1 == paymentAmount1);
+                assert(balanceBefore1 - balanceAfter1 == paymentAmount);
             }
         }
         vm.stopPrank();

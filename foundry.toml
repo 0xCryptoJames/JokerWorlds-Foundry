@@ -5,10 +5,12 @@ libs = ["lib"]
 
 
 [fuzz]
-runs = 500
+runs = 10000
 depth = 50
+max_test_rejects = 130000
 
 [invariant]
-runs = 500
+runs = 5000
 depth = 50
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

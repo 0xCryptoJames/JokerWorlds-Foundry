@@ -4,20 +4,18 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {JokerToken} from "../src/JokerToken.sol";
 import {HelperContract} from "./HelperContract.t.sol";
-import {console} from "forge-std/console.sol";
-import {OpenTest} from "./handlers/OpenTest.sol";
+import {JokerTokenTradeHandler} from "./handlers/JokerTokenTradeHandler.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract InvariantJokerTokenTest is Test, HelperContract {
     JokerToken jokerToken;
-    OpenTest handlerOfOpenTest;
+    JokerTokenTradeHandler handlerOfJokerToken;
 
     function setUp() external {
         vm.deal(address(this), 100 ether);
         jokerToken = new JokerToken{value: 0.005 ether}(treasury, protocolFeeDestination);
-        handlerOfOpenTest = new OpenTest(jokerToken);
-        targetContract(address(handlerOfOpenTest));
+        handlerOfJokerToken = new JokerTokenTradeHandler(jokerToken);
+        targetContract(address(handlerOfJokerToken));
     }
 
     function invariant_alwaysHaveEnoughEtherReserve() external view {
