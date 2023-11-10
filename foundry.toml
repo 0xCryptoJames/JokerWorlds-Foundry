@@ -2,12 +2,15 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-
+remappings = [
+    "@openzeppelin/contracts-upgradeable/contracts/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+]
 
 [fuzz]
 runs = 10000
 depth = 50
-max_test_rejects = 130000
+max_test_rejects = 13000000
 
 [invariant]
 runs = 5000

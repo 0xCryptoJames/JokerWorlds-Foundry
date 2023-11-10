@@ -6,9 +6,19 @@ import "../src/JokerToken.sol";
 import "./HelperContract.t.sol";
 
 contract JokerTokenTest is Test, HelperContract {
-    using stdStorage for StdStorage;
+    error PaymentFailed();
+    error InvalidInputs();
+    error InsufficientBalance();
+    error TransferDisabled();
+    error AddressBlacklisted();
 
     JokerToken public jokerToken;
+
+    event Blacklist(address indexed tokenContract, address indexed evilAddress, bool isBlacklisted);
+
+    event JokerTokenTrade(
+        address indexed tokenContract, address indexed trader, bool isBuy, uint256 amount, uint256 payment
+    );
 
     function setUp() external {
         vm.deal(address(this), 100 ether);
@@ -113,7 +123,7 @@ contract JokerTokenTest is Test, HelperContract {
                 jokerToken.getReserve(currentReserve0 + amount) - jokerToken.getReserve(currentReserve0);
             uint256 protocolFee = paymentAmount0 * jokerToken.protocolFeePercent() / 10000;
             if (paymentAmount < paymentAmount0 + protocolFee) {
-                vm.expectRevert(abi.encodeWithSignature("InsufficientPayment()"));
+                vm.expectRevert(abi.encodeWithSignature("InsufficientBalance()"));
                 jokerToken.buyTokens{value: paymentAmount}(amount);
             } else {
                 uint256 balanceBefore0 = jokerToken.balanceOf(caller);
@@ -137,7 +147,7 @@ contract JokerTokenTest is Test, HelperContract {
             jokerToken.sellTokens(amount);
         } else {
             if (amount > jokerToken.balanceOf(caller)) {
-                vm.expectRevert(abi.encodeWithSignature("InsufficientPayment()"));
+                vm.expectRevert(abi.encodeWithSignature("InsufficientBalance()"));
                 jokerToken.sellTokens(amount);
             } else {
                 uint256 balanceBefore0 = jokerToken.balanceOf(caller);

@@ -7,6 +7,7 @@ import {HelperContract} from "../test/HelperContract.t.sol";
 
 contract DeployJokerToken is Script, HelperContract {
     function run() external {
+        vm.deal(address(this), 100 ether);
         vm.startBroadcast();
         JokerToken jokerToken = new JokerToken{value: 0.005 ether}(treasury, protocolFeeDestination);
         vm.stopBroadcast();
