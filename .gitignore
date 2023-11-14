@@ -1,6 +1,8 @@
 # Compiler files
 cache/
 out/
+artifacts/
+broadcast/
 
 # Ignores development broadcast logs
 !/broadcast
@@ -16,7 +18,7 @@ docs/
 #Dependency files
 
 node_modules/
-deps/
+.deps/
 
 .vscode/
 .github/
