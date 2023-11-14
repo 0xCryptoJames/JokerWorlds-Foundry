@@ -27,8 +27,8 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
     bool public isPoolBlacklisted;
     bool public isMinterDestroyed;
     uint16 public protocolFeeRate = 25; // 1/6 cut of trading fees and calculate in basis points (4 decimals)
-    mapping(address => bool) public isUserBlacklisted;
     address public subjectOwner = 0x000000000000000000000000000000000000dEaD;
+    mapping(address => bool) public isUserBlacklisted;
 
     //Set subject fee destination as the subject owner
     modifier onlySubjectOwner() {
