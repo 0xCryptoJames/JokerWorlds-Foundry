@@ -19,8 +19,9 @@ contract SubjectsRegistryV1 is ISubjectsRegistryV1, Ownable {
 
     event SharePoolCreation(address subject, address subjectSharePool, string symbol);
 
-    constructor(IERC20 _jokerToken) Ownable(msg.sender) {
+    constructor(IERC20 _jokerToken, address _protocolFeeDestination) Ownable(msg.sender) {
         JOKER_TOKEN = _jokerToken;
+        protocolFeeDestination = _protocolFeeDestination;
     }
 
     function addToRegistry(

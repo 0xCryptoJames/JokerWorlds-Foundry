@@ -1,8 +1,8 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Test} from "forge-std/Test.sol";
-import {JokerToken} from "../src/JokerToken.sol";
+import "forge-std/Test.sol";
+import "../src/JokerToken.sol";
 
 abstract contract HelperContract {
     address public treasury = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
@@ -16,6 +16,6 @@ abstract contract HelperContract {
     string public name = "Death Address";
     string public symbol = "DAT";
     uint112 public maxSupply = 2100 * (10 ** 8);
-    uint256 public halfMaxPrice = 6 * (10 ** 8);
+    uint256 public halfMaxPrice = 1 * (10 ** 8);
     uint112 public midwaySupply = 100 * (10 ** 8);
 }

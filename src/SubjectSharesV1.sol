@@ -12,14 +12,13 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
     error PaymentFailed();
     error InvalidInputs();
     error InsufficientBalance();
-    error AddressBlacklisted();
+    error AddressOrPoolBlacklisted();
     error Unauthorized();
     error MinterDestroyed();
 
     uint256 public immutable HALF_MAXPRICE; //Represents half of the maximum allowed price in 8 decimals
     uint112 public immutable MAX_SUPPLY; // In 8 decimals
     uint112 public immutable MIDWAY_SUPPLY; // Represents the supply at half max price in 8 decimals
-    uint256 public immutable MINIMUM_LIQUIDITY; // In 8 decimals
 
     IERC20 public immutable JOKER_TOKEN;
     address public immutable REGISTRY;
@@ -57,9 +56,8 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
         MIDWAY_SUPPLY = _midwaySupply;
         REGISTRY = msg.sender;
         subjectOwner = _subjectOwner;
-        MINIMUM_LIQUIDITY = HALF_MAXPRICE; // In 8 decimals
 
-        bool success = JOKER_TOKEN.transferFrom(tx.origin, address(this), HALF_MAXPRICE / (10 ** 8));
+        bool success = JOKER_TOKEN.transferFrom(subjectOwner, address(this), HALF_MAXPRICE / (10 ** 8));
         if (!success) {
             revert PaymentFailed();
         }
@@ -77,6 +75,10 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
 
     function getReserve(uint112 supply) external view returns (uint256) {
         return _getReserve(supply);
+    }
+
+    function getFees(uint256 _paymentAmount) external view returns (uint256 protocolFee, uint256 subjectFee) {
+        return _getFees(_paymentAmount);
     }
 
     function updatePoolStatus(bool _isPoolBlacklisted) external onlyOwner {
@@ -141,24 +143,24 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
         }
         address protocolFeeDestination = ISubjectsRegistryV1(REGISTRY).protocolFeeDestination();
         uint112 currentSupply = uint112(totalSupply());
-        uint256 currentReserve = JOKER_TOKEN.balanceOf(address(this)); // gas saving
+        uint256 currentReserve = JOKER_TOKEN.balanceOf(address(this)); // The pool's accumulated reserve
         uint256 paymentAmount;
         {
-            //Scope for avoiding stack too deep errors
-            uint256 reserve0 = _getReserve(currentSupply);
-            uint256 paymentAmount0 = _getReserve(currentSupply - amount) - _getReserve(currentSupply);
+            //Scope for avoiding stack too deep error
+            uint256 reserve0 = _getReserve(currentSupply); //Calculated theoretical reserve excluding incomes.
+            uint256 paymentAmount0 = _getReserve(currentSupply) - _getReserve(currentSupply - amount);
             uint256 profitToShare = currentReserve > reserve0 ? (currentReserve - reserve0) : 0; //The total incomes distributed by the application linked to this pool
             paymentAmount = paymentAmount0 * profitToShare / reserve0 + paymentAmount0;
         }
         (uint256 protocolFee, uint256 subjectFee) = _getFees(paymentAmount);
         _burn(msg.sender, amount);
         {
-            //Scope for avoiding stack too deep errors
+            //Scope for avoiding stack too deep error
             bool success1 = JOKER_TOKEN.transfer(protocolFeeDestination, protocolFee / (10 ** 8));
             bool success2 = JOKER_TOKEN.transfer(subjectOwner, subjectFee / (10 ** 8));
             bool success3 = JOKER_TOKEN.transfer(msg.sender, (paymentAmount - protocolFee - subjectFee) / (10 ** 8));
             currentReserve = JOKER_TOKEN.balanceOf(address(this));
-            if (!success1 || !success2 || !success3 || (currentReserve < MINIMUM_LIQUIDITY)) {
+            if (!success1 || !success2 || !success3) {
                 revert PaymentFailed();
             }
         }
@@ -169,7 +171,7 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
             revert InvalidInputs();
         }
         if (isUserBlacklisted[from] || isUserBlacklisted[to] || isPoolBlacklisted) {
-            revert AddressBlacklisted();
+            revert AddressOrPoolBlacklisted();
         }
         super._update(from, to, amount);
         if (totalSupply() >= type(uint112).max) {
@@ -189,8 +191,10 @@ contract SubjectSharesV1 is Ownable, ReentrancyGuard, ERC20 {
         return reserve;
     }
 
-    function _getFees(uint256 _paymentAmount) private view returns (uint256, uint256) {
+    function _getFees(uint256 _paymentAmount) private view returns (uint256 protocolFee, uint256 subjectFee) {
         uint16 _protocolFeeRate = protocolFeeRate;
-        return (_paymentAmount * _protocolFeeRate / 10000, _paymentAmount * (150 - _protocolFeeRate) / 10000);
+        protocolFee = _paymentAmount * _protocolFeeRate / 10000;
+        subjectFee = _paymentAmount * (150 - _protocolFeeRate) / 10000;
+        return (protocolFee, subjectFee);
     }
 }

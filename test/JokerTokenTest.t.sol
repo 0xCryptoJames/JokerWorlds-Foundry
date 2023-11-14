@@ -122,7 +122,7 @@ contract JokerTokenTest is Test, HelperContract {
             uint256 paymentAmount0 =
                 jokerToken.getReserve(currentReserve0 + amount) - jokerToken.getReserve(currentReserve0);
             uint256 protocolFee = paymentAmount0 * jokerToken.protocolFeePercent() / 10000;
-            if (paymentAmount < paymentAmount0 + protocolFee) {
+            if (paymentAmount * (10 ** 8) < paymentAmount0 + protocolFee) {
                 vm.expectRevert(abi.encodeWithSignature("InsufficientBalance()"));
                 jokerToken.buyTokens{value: paymentAmount}(amount);
             } else {
@@ -156,13 +156,13 @@ contract JokerTokenTest is Test, HelperContract {
                 uint256 paymentAmount =
                     jokerToken.getReserve(currentReserve1) - jokerToken.getReserve(currentReserve1 - amount);
                 vm.expectEmit(true, true, true, true, address(jokerToken));
-                emit JokerTokenTrade(address(jokerToken), caller, false, amount, paymentAmount);
+                emit JokerTokenTrade(address(jokerToken), caller, false, amount, paymentAmount / (10 ** 8));
                 jokerToken.sellTokens(amount);
                 uint256 balanceAfter0 = jokerToken.balanceOf(caller);
                 uint256 balanceAfter1 = address(jokerToken).balance;
 
                 assert(uint112(balanceBefore0 - balanceAfter0) == amount);
-                assert(balanceBefore1 - balanceAfter1 == paymentAmount);
+                assert(balanceBefore1 - balanceAfter1 == paymentAmount / (10 ** 8));
             }
         }
         vm.stopPrank();

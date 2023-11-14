@@ -92,11 +92,11 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         uint112 currentReserve = uint112(totalSupply());
         uint256 paymentAmount = _getReserve(currentReserve + amount) - _getReserve(currentReserve);
         uint256 protocolFee = paymentAmount * protocolFeePercent / 10000;
-        //Accounts for decimal differences in calculation
-        if ((msg.value * (10 ** 10)) < paymentAmount + protocolFee) {
+
+        if ((msg.value) * (10 ** 8) < paymentAmount + protocolFee) {
             revert InsufficientBalance();
         }
-        (bool success,) = payable(protocolFeeDestination).call{value: protocolFee / (10 ** 10)}("");
+        (bool success,) = payable(protocolFeeDestination).call{value: protocolFee / (10 ** 8)}("");
         if (!success) {
             revert PaymentFailed();
         }
@@ -115,9 +115,9 @@ contract JokerToken is Ownable, ReentrancyGuard, ERC20 {
         uint256 paymentAmount = _getReserve(currentReserve) - _getReserve(currentReserve - amount);
         uint256 protocolFee = paymentAmount * protocolFeePercent / 1 ether;
         _burn(msg.sender, amount);
-        emit JokerTokenTrade(address(this), msg.sender, false, amount, paymentAmount / (10 ** 10));
-        (bool success1,) = payable(protocolFeeDestination).call{value: protocolFee / (10 ** 10)}("");
-        (bool success2,) = payable(msg.sender).call{value: (paymentAmount - protocolFee / (10 ** 10))}("");
+        emit JokerTokenTrade(address(this), msg.sender, false, amount, paymentAmount / (10 ** 8));
+        (bool success1,) = payable(protocolFeeDestination).call{value: protocolFee / (10 ** 8)}("");
+        (bool success2,) = payable(msg.sender).call{value: (paymentAmount - protocolFee) / (10 ** 8)}("");
         if (!success1 || !success2) {
             revert PaymentFailed();
         }
