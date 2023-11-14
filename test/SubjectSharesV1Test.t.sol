@@ -78,8 +78,8 @@ contract SubjectSharesV1Test is Test, HelperContract {
         uint112 _midwaySupply //In 8 decimals
     ) external {
         vm.assume(
-            caller != address(0) && _halfMaxPrice > 1 * (10 ** 8) && _halfMaxPrice <= 50 * (10 ** 8)
-                && _midwaySupply > 1 * (10 ** 8) && _midwaySupply < _maxSupply
+            caller != address(0) && _subjectOwner != address(0) && _halfMaxPrice > 1 * (10 ** 8)
+                && _halfMaxPrice <= 50 * (10 ** 8) && _midwaySupply > 1 * (10 ** 8) && _midwaySupply < _maxSupply
         );
         vm.deal(_subjectOwner, 4900000 ether);
         vm.startPrank(_subjectOwner);
